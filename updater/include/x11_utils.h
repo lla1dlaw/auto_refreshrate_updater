@@ -1,5 +1,18 @@
-#ifndef DISPLAY_INFO_H
-#define DISPLAY_INFO_H
+#ifndef _DISPLAY_INFO_H
+#define _DISPLAY_INFO_H
+
+#include <stdbool.h>
+
+/**
+ * @struct AppPreferences
+ * @brief Holds information that the user configures when the configurator is run that is stored in the config file. 
+ */
+typedef struct {
+  bool configured; // whether the user has configured the app-preferences or not.
+  bool enabled;
+  float rate_on_bat;
+  float rate_on_ac;
+} AppPreferences;
 
 /**
  * @struct DisplayMode
@@ -73,7 +86,7 @@ void free_display_modes(DisplayMode* modes);
  * @return 0 on success, -1 if the display is not found, -2 if the mode is
  * not found, and -3 on other X11/Xrandr errors.
  */
-int set_display_mode(const char* display_name, int width, int height, float refresh_rate);
+int set_display_mode(const char* display_name, unsigned int width, unsigned int height, float refresh_rate);
 
 /**
  * @brief Sets a display to its "preferred" mode.

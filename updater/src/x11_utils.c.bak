@@ -155,11 +155,11 @@ void free_display_modes(DisplayMode* modes) {
     free(modes);
 }
 
-static int apply_mode(Display* dpy, XRRScreenResources* res, RROutput output_id, RRCrtc crtc_id, XRRCrtcInfo* crtc_info, RRMode mode_id) {
+static int apply_mode(Display* dpy, XRRScreenResources* res, RROutput output_id, XRRCrtcInfo* crtc_info, RRMode mode_id) {
   
   Status status = XRRSetCrtcConfig(dpy,
                                    res,
-                                   crtc_id,
+                                   crtc_info->crtc,
                                    CurrentTime,
                                    crtc_info->x,
                                    crtc_info->y,
@@ -171,30 +171,23 @@ static int apply_mode(Display* dpy, XRRScreenResources* res, RROutput output_id,
   return (status == RRSetConfigSuccess) ? 0 : -3;
 }
 
-static RRCrtc find_crtc(Display* dpy, XRRScreenResources* res, XRROutputInfo* output_info, XRRCrtcInfo** crtc_info_out) {
+static XRRCrtcInfo* get_crtc_for_output(Display* dpy, XRRScreenResources* res, XRROutputInfo* output_info) {
     if (output_info->crtc) {
-        *crtc_info_out = XRRGetCrtcInfo(dpy, res, output_info->crtc);
-        if (*crtc_info_out) {
-            return output_info->crtc;
-        }
+        return XRRGetCrtcInfo(dpy, res, output_info->crtc);
     }
-    
-    // If no CRTC is assigned or getting info failed, try to find a free one
+    // If no CRTC is assigned, try to find a free one
     for (int i = 0; i < res->ncrtc; i++) {
         XRRCrtcInfo* crtc = XRRGetCrtcInfo(dpy, res, res->crtcs[i]);
         if (crtc && crtc->mode == None) {
             // Found a free CRTC
-            *crtc_info_out = crtc;
-            return res->crtcs[i];
+            return crtc;
         }
         if (crtc) XRRFreeCrtcInfo(crtc);
     }
-    
-    *crtc_info_out = NULL;
-    return 0; // Return 0 if no CRTC is found
+    return NULL;
 }
 
-int set_display_mode(const char* display_name, unsigned int width, unsigned int height, float refresh_rate) {
+int set_display_mode(const char* display_name, int width, int height, float refresh_rate) {
     Display* dpy = XOpenDisplay(NULL);
     if (!dpy) return -3;
 
@@ -240,16 +233,14 @@ int set_display_mode(const char* display_name, unsigned int width, unsigned int 
     if (target_mode_id == 0) goto cleanup;
 
     // 3. Find the CRTC
-    XRRCrtcInfo* crtc_info = NULL;
-    RRCrtc crtc_id = find_crtc(dpy, res, output_info, &crtc_info);
-    
-    if (crtc_id == 0) {
+    XRRCrtcInfo* crtc_info = get_crtc_for_output(dpy, res, output_info);
+    if (!crtc_info) {
         result = -3; // No CRTC available
         goto cleanup;
     }
 
     // 4. Apply the mode
-    result = apply_mode(dpy, res, output_id, crtc_id, crtc_info, target_mode_id);
+    result = apply_mode(dpy, res, output_id, crtc_info, target_mode_id);
     
     XRRFreeCrtcInfo(crtc_info);
 
@@ -298,15 +289,14 @@ int set_display_mode_auto(const char* display_name) {
     if (preferred_mode_id == 0) goto cleanup;
 
     // 3. Find the CRTC
-    XRRCrtcInfo* crtc_info = NULL;
-    RRCrtc crtc_id = find_crtc(dpy, res, output_info, &crtc_info);
-    if (crtc_id == 0) {
+    XRRCrtcInfo* crtc_info = get_crtc_for_output(dpy, res, output_info);
+    if (!crtc_info) {
         result = -3; // No CRTC available
         goto cleanup;
     }
 
     // 4. Apply the mode
-    result = apply_mode(dpy, res, output_id, crtc_id, crtc_info, preferred_mode_id);
+    result = apply_mode(dpy, res, output_id, crtc_info, preferred_mode_id);
 
     XRRFreeCrtcInfo(crtc_info);
 
